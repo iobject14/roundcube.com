@@ -1,0 +1,50 @@
+services:
+  database:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${ROUNDCUBE_DB_NAME}
+      MARIADB_USER: ${ROUNDCUBE_DB_USER}
+      MARIADB_PASSWORD: ${ROUNDCUBE_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    volumes:
+      - roundcube_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - roundcube_internal
+
+  roundcube:
+    image: roundcube/roundcubemail:1.6.x-apache
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      ROUNDCUBEMAIL_DB_TYPE: mysql
+      ROUNDCUBEMAIL_DB_HOST: database
+      ROUNDCUBEMAIL_DB_NAME: ${ROUNDCUBE_DB_NAME}
+      ROUNDCUBEMAIL_DB_USER: ${ROUNDCUBE_DB_USER}
+      ROUNDCUBEMAIL_DB_PASSWORD: ${ROUNDCUBE_DB_PASSWORD}
+      ROUNDCUBEMAIL_DEFAULT_HOST: ${IMAP_SERVER}
+      ROUNDCUBEMAIL_DEFAULT_PORT: ${IMAP_PORT}
+      ROUNDCUBEMAIL_SMTP_SERVER: ${SMTP_SERVER}
+      ROUNDCUBEMAIL_SMTP_PORT: ${SMTP_PORT}
+      ROUNDCUBEMAIL_SKIN: elastic
+    volumes:
+      - roundcube_www:/var/www/html
+    networks:
+      - roundcube_internal
+
+volumes:
+  roundcube_db:
+  roundcube_www:
+
+networks:
+  roundcube_internal:
+    driver: bridge
